@@ -148,10 +148,12 @@ class TPown
     def install_ssh
         puts "Downloading dropbearmulti and dropbearserver.sh from https://github.com/ecdsa521/tpown"
 
-        cmd("wget -O /usr/sbin/dropbearmulti https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearmulti")
-        cmd("wget -O /etc/init.d/dropbearserver https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearserver.sh")
+        cmd("test -f /usr/sbin/dropbearmulti || wget -O /usr/sbin/dropbearmulti https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearmulti")
+        cmd("test -f /etc/init.d/dropbearserver || wget -O /etc/init.d/dropbearserver https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearserver.sh")
         cmd("chmod +x /etc/init.d/dropbearserver /usr/sbin/dropbearmulti")
-
+        cmd("ln -sv ../init.d/dropbearserver /etc/rc0.d/K77dropbear")
+        cmd("ln -sv ../init.d/dropbearserver /etc/rcS.d/S77dropbear")
+        
         data = cmd("md5sum /usr/sbin/dropbearmulti")
         if data.match(/c83b037cb48139035b5975d3f3841c70/)
             cmd("/etc/init.d/dropbearserver start")
