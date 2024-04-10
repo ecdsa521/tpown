@@ -145,6 +145,24 @@ class TPown
 
     end
 
+    def install_ssh
+        puts "Downloading dropbearmulti and dropbearserver.sh from https://github.com/ecdsa521/tpown"
+
+        cmd("wget -O /usr/sbin/dropbearmulti https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearmulti")
+        cmd("wget -O /etc/init.d/dropbearserver https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearserver.sh")
+        cmd("chmod +x /etc/init.d/dropbearserver /usr/sbin/dropbearmulti")
+
+        data = cmd("md5sum /usr/sbin/dropbearmulti")
+        if data.match(/c83b037cb48139035b5975d3f3841c70/)
+            cmd("/etc/init.d/dropbearserver start")
+            puts "Starting dropbear server at #{@options[:target]}. "
+            puts "Default password is oelinux123"
+        else 
+            raise "Wrong checksum of dropbear binary?"
+        end
+
+    end
+
 
     def start_server
 
@@ -200,5 +218,8 @@ if tp.options[:version] == 1
     tp.cleanup_v1()
 
 end
-puts tp.cmd("ls")
-p tp.cmd("id")
+
+if tp.options[:ssh]
+    tp.install_ssh
+end
+
