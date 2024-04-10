@@ -166,6 +166,15 @@ class TPown
 
     end
 
+    def install_adb
+        puts "Enabling adb by default - so you can use adb shell"
+        cmd("uci set usb_enum.enum.mode=debug")
+        cmd("usb_enum.enum.debug_pid=902B")
+        cmd("echo 902B > /sbin/usb/compositions/hsusb_next")
+        cmd("uci commit usb_enum")
+
+
+    end
 
     def start_server
 
@@ -224,5 +233,9 @@ end
 
 if tp.options[:ssh]
     tp.install_ssh
+end
+
+if tp.options[:adb]
+    tp.install_adb
 end
 
