@@ -1,6 +1,7 @@
 #!env ruby
-require 'optparse'
-require 'curb'
+require 'bundler'
+Bundler.require
+
 require 'json'
 require 'openssl'
 class TPown 
