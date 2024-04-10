@@ -96,6 +96,21 @@ class TPown
 
     end
 
+    def connect_telnet()
+        puts "Connecting to telnetd"
+        @client = Net::Telnet::new("Host" => @options[:target], "Prompt" => /\/ # \z/n, "Timeout" => 10, "Telnetmode" => true, "Waittime" => 0.3)
+        
+    end
+
+    def cmd(c)
+        connect_telnet if @client.nil? 
+        data = ""
+        @client.cmd(c) do |c|
+            data += c
+        end
+
+        return data
+    end
 
 
     def login()
@@ -171,4 +186,6 @@ tp.login()
 if tp.options[:version] == 5
     tp.payload_v5()
     tp.cleanup_v5()
+
 end
+puts tp.cmd("ls")
