@@ -32,16 +32,16 @@ class TPown
             http.headers["Content-Type"] = "application/json"
         end
         p res.body
-        res = Curl.post("http://#{@options[:target]}/cgi-bin/qcmap_web_cgi", payload_del) do |http|
-            http.headers["Content-Type"] = "application/json"
-        end
-        p res.body
-
+       
+        cleanup_v1
     
     end
 
     def cleanup_v1
-
+        res = Curl.post("http://#{@options[:target]}/cgi-bin/qcmap_web_cgi", payload_del) do |http|
+            http.headers["Content-Type"] = "application/json"
+        end
+        p res.body
     end
 
 
