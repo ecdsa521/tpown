@@ -2,7 +2,19 @@
 Simple script for hacking your TP-Link M7350 LTE modem/router
 
 # Usage:
-    $ ruby tp.rb -t [ip] -p [password] [--adb] [--ssh] [-5/-1] 
+    $ ruby tp.rb -t [ip] -p [password] 
+        Options:
+        -s, --ssh                  Install dropbear SSH server
+        -a, --adb                  Enable ADBD service
+        -k, --keep                 Keep the telnetd payload
+        -p, --pass=<s>             Web interface password
+        -t, --target=<s>           Target IP
+        -r, --rce=<i>              RCE version, 1, 5 or autodetect if left empty
+        -d, --dropbear-bin=<s>     Dropbear binary location (default:
+                                    https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearmulti)
+        -o, --dropbear-init=<s>    Dropbear init script location (default:
+                                    https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearserver.sh)
+        -h, --help                 Show this message
 
 - -1 switch is for older board revision, uses language RCE
 - -5 switch is for v5 board or newer, uses PortForward RCE

