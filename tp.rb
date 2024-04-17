@@ -72,7 +72,7 @@ class TPown
         
         nonce = data["nonce"].to_s
         if @options[:rce] == 1
-            digest = ::OpenSSL::Digest::MD5.hexdigest(@options[:name] + ":" + @options[:pass] + ":" + nonce)
+            digest = ::OpenSSL::Digest::MD5.hexdigest(@options[:user] + ":" + @options[:pass] + ":" + nonce)
         else
             digest = ::OpenSSL::Digest::MD5.hexdigest(@options[:pass] + ":" + nonce)
         end
